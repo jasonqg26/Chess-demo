@@ -6,6 +6,6 @@ module com.example.chessdemo {
     requires org.kordamp.bootstrapfx.core;
     requires com.almasb.fxgl.all;
 
-    opens com.example.chessdemo to javafx.fxml;
-    exports com.example.chessdemo;
+    opens Main to javafx.fxml;
+    exports Main;
 }
