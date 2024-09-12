@@ -1,5 +1,6 @@
 package Scenas;
 
+import Dominio.RulesForPices;
 import Features.DragAndDrop;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
@@ -13,6 +14,7 @@ import javafx.scene.layout.*;
 
 public class GameScene {
     DragAndDrop dragAndDrop = new DragAndDrop();
+    RulesForPices rulesForPices = new RulesForPices(dragAndDrop);
     Scene scene;
     private BorderPane borderPane;
 
@@ -34,26 +36,43 @@ public class GameScene {
      */
     public BorderPane BodyScene() {
         BorderPane borderPane = new BorderPane();
-
-        GridPane gridPane = new GridPane();
-        gridPane.setHgap(0.5);
-        gridPane.setVgap(0.5);
-        gridPane.setStyle("-fx-border-color: black; -fx-border-width: 2;");
-
-        for (int i = 0; i < 8; i++) {
-            gridPane.getRowConstraints().add(new RowConstraints());
-            gridPane.getColumnConstraints().add(new ColumnConstraints());
-        }
+        GridPane gridPane = createGridPane();
+        configureGridPane(gridPane);
         addBoard(gridPane);
-
         HBox hBox = new HBox(gridPane);
         hBox.setAlignment(Pos.CENTER);
         VBox vBox = new VBox(hBox);
         vBox.setAlignment(Pos.CENTER);
-
-
         borderPane.setCenter(vBox);
         return borderPane;
+    }
+
+
+    /**
+     * Crea un GridPane con la configuración inicial.
+     *
+     * @return El GridPane configurado.
+     */
+    private GridPane createGridPane() {
+        GridPane gridPane = new GridPane();
+        gridPane.setHgap(0.5);
+        gridPane.setVgap(0.5);
+        gridPane.setStyle("-fx-border-color: black; -fx-border-width: 2;");
+        return gridPane;
+    }
+
+
+    /**
+     * Configura el GridPane creando las celdas, añadiendo colores, piezas iniciales y eventos.
+     *
+     * @param gridPane El GridPane a configurar.
+     */
+    private void configureGridPane(GridPane gridPane) {
+        for (int i = 0; i < 8; i++) {
+            gridPane.getRowConstraints().add(new RowConstraints());
+            gridPane.getColumnConstraints().add(new ColumnConstraints());
+        }
+
     }
 
 
@@ -69,8 +88,10 @@ public class GameScene {
 
         for (int col = 0; col < 8; col++) {
             for (int row = 0; row < 8; row++) {
-                StackPane stackPane = new StackPane();
+                StackPane stackPane = createStackPane(row, col);
                 gridPane.add(stackPane, col, row);
+
+
                 // Método encargado de la lógica para los diferentes colores de cada celda del tablero
                 configureBoardColor(stackPane, row, col);
                 // Método encargado de colocar cada pieza en su lugar inicial
@@ -85,6 +106,21 @@ public class GameScene {
 
 
     /**
+     * Crea un GridPane con la configuración inicial.
+     *
+     * @return El GridPane configurado.
+     */
+    private StackPane createStackPane(int row, int col) {
+        StackPane stackPane = new StackPane();
+        stackPane.getProperties().put("row", row);
+        stackPane.getProperties().put("col", col);
+
+        return stackPane;
+
+    }
+
+
+    /**
      * Coloca una pieza en su posición inicial en el tablero.
      *
      * @param stackPane El StackPane en el cual se añadirá la pieza.
@@ -92,27 +128,14 @@ public class GameScene {
      * @param col La columna donde se colocará la pieza.
      * @param color El color de la pieza (puede ser "blanco" o "negro").
      */
-    public void addPiece(StackPane stackPane, int row, int col,String color) {
+    private void addPiece(StackPane stackPane, int row, int col, String color) {
         if (col == 0 || col == 7) {
             switch (row) {
-                case 0:
-                case 7:
-                    createPiece(stackPane, "torre", color);
-                    break;
-                case 1:
-                case 6:
-                    createPiece(stackPane, "caballero", color);
-                    break;
-                case 2:
-                case 5:
-                    createPiece(stackPane, "obispo", color);
-                    break;
-                case 4:
-                    createPiece(stackPane, "reina", color);
-                    break;
-                case 3:
-                    createPiece(stackPane, "rey", color);
-                    break;
+                case 0, 7 -> createPiece(stackPane, "torre", color);
+                case 1, 6 -> createPiece(stackPane, "caballero", color);
+                case 2, 5 -> createPiece(stackPane, "obispo", color);
+                case 4 -> createPiece(stackPane, "reina", color);
+                case 3 -> createPiece(stackPane, "rey", color);
             }
         } else {
             createPiece(stackPane, "peon", color);
@@ -149,6 +172,8 @@ public class GameScene {
         Image image = new Image(filePath);
         ImageView imageView = new ImageView(image);
         imageView.getProperties().put("is", "pieza");
+        imageView.getProperties().put("type", pieceType);
+        imageView.getProperties().put("color", color);
         stackPane.getChildren().add(imageView);
     }
 
@@ -161,55 +186,219 @@ public class GameScene {
      */
     private void setDragAndDrop(StackPane stackPane, GridPane gridPane) {
         stackPane.setOnMouseDragged(event -> handleDrag(stackPane, event));
-        gridPane.setOnMouseReleased(event -> handleMouseRelease(gridPane, event));
+        if (dragAndDrop != null) {
+            gridPane.setOnMouseReleased(event -> handleMouseRelease(gridPane, event));
+        }
     }
 
 
     /**
-     * Este método toma la imagen de la pieza que se arrastra y la elimina del StackPane,
-     * actualizando el cursor con la imagen de la pieza para que se pueda mover libremente por el tablero.
+     * Este método maneja el evento de arrastre del ratón en un StackPane. Si el StackPane
+     * contiene una pieza, se actualiza la información de arrastre, se elimina la pieza del StackPane,
+     * y se actualiza el cursor con la imagen de la pieza que se está arrastrando.
      *
-     * @param stackPane El StackPane que contiene la pieza.
-     * @param event El evento de arrastrar el ratón.
+     * @param stackPane El StackPane que contiene la pieza a arrastrar.
+     * @param event El evento de arrastre del ratón.
      */
     private void handleDrag(StackPane stackPane, MouseEvent event) {
-        if (!stackPane.getChildren().isEmpty()) {
-            ImageView imageView = (ImageView) stackPane.getChildren().get(stackPane.getChildren().size() - 1);
-
-            if (imageView.getProperties().get("is").equals("pieza")) {
-                dragAndDrop.setImageView((ImageView) stackPane.getChildren().get(stackPane.getChildren().size() - 1));
-                stackPane.getChildren().remove(stackPane.getChildren().size() - 1);
-                Cursor cursor = new ImageCursor(dragAndDrop.getImageView().getImage());
-                scene.setCursor(cursor);
-            }
+        if (isPieceInStackPane(stackPane)) { // Verifica si el StackPane contiene una pieza.
+            updateDragAndDropData(stackPane); // Actualiza la información de la pieza arrastrada.
+            removePieceFromStackPane(stackPane); // Elimina la pieza del StackPane.
+            updateCursorWithPieceImage(); // Actualiza el cursor con la imagen de la pieza.
         }
-        event.consume();
+        event.consume(); // Consume el evento para que no se propague más allá.
+    }
+
+    /**
+     * Verifica si un StackPane contiene una pieza de ajedrez.
+     *
+     * @param stackPane El StackPane a verificar.
+     * @return true si el StackPane contiene una pieza, false en caso contrario.
+     */
+    private boolean isPieceInStackPane(StackPane stackPane) {
+        return !stackPane.getChildren().isEmpty() && // Verifica si el StackPane no está vacío.
+                "pieza".equals(stackPane.getChildren().getLast().getProperties().get("is")); // Verifica si el último hijo es una pieza.
+    }
+
+    /**
+     * Actualiza la información de la pieza que se está arrastrando, incluyendo su posición inicial
+     * y la referencia a la imagen de la pieza.
+     *
+     * @param stackPane El StackPane que contiene la pieza a arrastrar.
+     */
+    private void updateDragAndDropData(StackPane stackPane) {
+        // Guarda la posición inicial de la pieza que se está arrastrando.
+        dragAndDrop.setInitial_positionX((int) stackPane.getProperties().get("row"));
+        dragAndDrop.setInitial_positionY((int) stackPane.getProperties().get("col"));
+
+        // Guarda la referencia a la imagen de la pieza que se está arrastrando.
+        dragAndDrop.setImageView((ImageView) stackPane.getChildren().get(stackPane.getChildren().size() - 1));
+    }
+
+    /**
+     * Elimina la pieza de ajedrez del StackPane que la contiene.
+     *
+     * (Debe tener una pieza sino eliminara el tablero)
+     *
+     * @param stackPane El StackPane que contiene la pieza a eliminar.
+     */
+    private void removePieceFromStackPane(StackPane stackPane) {
+        // Elimina la última pieza (el último hijo) del StackPane.
+        stackPane.getChildren().remove(stackPane.getChildren().size() - 1);
+    }
+
+    /**
+     * Actualiza el cursor del ratón para que muestre la imagen de la pieza que se está arrastrando.
+     */
+    private void updateCursorWithPieceImage() {
+        // Crea un nuevo cursor utilizando la imagen de la pieza que se está arrastrando.
+        Cursor cursor = new ImageCursor(dragAndDrop.getImageView().getImage());
+
+        // Asigna el nuevo cursor a la escena.
+        scene.setCursor(cursor);
     }
 
 
+
+
+
+
+
+
+
+
     /**
-     * Este método coloca la pieza en el StackPane correspondiente después de soltarla,
-     * determinando la nueva posición a partir de las coordenadas del evento.
+     * Este método maneja la liberación del ratón, coloca la pieza en la posición correcta,
+     * y determina si se debe realizar una captura de una pieza enemiga.
      *
      * @param gridPane El GridPane que contiene el tablero.
-     * @param event El evento de soltar el ratón.
+     * @param event El evento de liberación del ratón.
      */
     private void handleMouseRelease(GridPane gridPane, MouseEvent event) {
-        ImageView targetStackPane = (ImageView) event.getPickResult().getIntersectedNode();
+        Node targetNode = event.getPickResult().getIntersectedNode();
 
-        if (targetStackPane != null) {
-            int roW = (int) targetStackPane.getProperties().get("row");
-            int coL = (int) targetStackPane.getProperties().get("col");
+        if (dragAndDrop.getImageView() != null && isValidTarget(targetNode)) {
+            StackPane targetStackPane = (StackPane) targetNode.getParent();
 
-            if (coL == 0) {
-                StackPane stackPanE = (StackPane) gridPane.getChildren().get(roW);
-                placePiece(stackPanE);
+            if (isOccupiedByPiece(targetNode)) {
+                handleOccupiedSquare(targetStackPane, gridPane, targetNode);
             } else {
-                int index = (7 * coL) + roW + coL;
-                StackPane stackPanE = (StackPane) gridPane.getChildren().get(index);
-                placePiece(stackPanE);
+                handleEmptySquare(targetStackPane, gridPane);
             }
         }
+    }
+
+    /**
+     * Verifica si el nodo de destino es válido y contiene la propiedad "is".
+     *
+     * @param targetNode El nodo de destino.
+     * @return true si el nodo de destino es válido, de lo contrario false.
+     */
+    private boolean isValidTarget(Node targetNode) {
+        return targetNode != null && targetNode.getProperties().containsKey("is");
+    }
+
+    /**
+     * Verifica si el nodo de destino está ocupado por una pieza.
+     *
+     * @param targetNode El nodo de destino.
+     * @return true si el nodo está ocupado por una pieza, de lo contrario false.
+     */
+    private boolean isOccupiedByPiece(Node targetNode) {
+        return "pieza".equals(targetNode.getProperties().get("is"));
+    }
+
+    /**
+     * Maneja el caso en el que la casilla objetivo ya está ocupada por una pieza.
+     *
+     * @param targetStackPane El StackPane de destino.
+     * @param gridPane El GridPane que contiene el tablero.
+     * @param targetNode El nodo de destino.
+     */
+    private void handleOccupiedSquare(StackPane targetStackPane, GridPane gridPane, Node targetNode) {
+        boolean canEat = rulesForPices.canEatThisColor(targetNode, dragAndDrop.getImageView());
+
+        dragAndDrop.setCanEatSomething(canEat);
+
+        if (canEat && tryMovePiece(targetNode.getParent(), gridPane, true)) {
+            removePiece(targetStackPane);
+        } else {
+            tryMovePiece(targetNode.getParent(), gridPane, false);
+            dragAndDrop.setCanEatSomething(false);
+        }
+    }
+
+    /**
+     * Maneja el caso en el que la casilla objetivo está vacía.
+     *
+     * @param targetStackPane El StackPane de destino.
+     * @param gridPane El GridPane que contiene el tablero.
+     */
+    private void handleEmptySquare(StackPane targetStackPane, GridPane gridPane) {
+        Node lastChild = targetStackPane.getChildren().get(targetStackPane.getChildren().size() - 1);
+        if (isOccupiedByPiece(lastChild)) {
+            handleOccupiedSquare(targetStackPane, gridPane, lastChild);
+        } else {
+            tryMovePiece(targetStackPane, gridPane, true);
+        }
+    }
+
+    /**
+     * Intenta mover la pieza a la nueva posición y verifica si el movimiento es válido.
+     *
+     * @param targetStackPane El StackPane de destino.
+     * @param gridPane El GridPane que contiene el tablero.
+     * @param canEatColor Indica si la pieza puede capturar una pieza enemiga.
+     * @return true si el movimiento es válido y se realizó, de lo contrario false.
+     */
+    private boolean tryMovePiece(Node targetStackPane, GridPane gridPane, boolean canEatColor) {
+        int nexRow = (int) targetStackPane.getProperties().get("row");
+        int nexCol = (int) targetStackPane.getProperties().get("col");
+        int startRow = dragAndDrop.getInitial_positionX();
+        int startCol = dragAndDrop.getInitial_positionY();
+
+        if (canEatColor && rulesForPices.validMovement(nexRow, nexCol, startRow, startCol,
+                dragAndDrop.getImageView().getProperties().get("type").toString(),
+                dragAndDrop.getImageView().getProperties().get("color").toString())) {
+
+            if (!piecesInTheMiddle(startRow,startCol,nexRow,nexCol,gridPane)){
+
+                movePieceToNewLocation(nexRow, nexCol, gridPane);
+                return true;
+
+            }
+            else {
+                goBack(startRow, startCol, gridPane);
+                return false;
+            }
+
+
+        } else {
+            goBack(startRow, startCol, gridPane);
+            return false;
+        }
+    }
+
+    /**
+     * Mueve la pieza a la nueva ubicación en el tablero.
+     *
+     * @param nexRow La fila de destino.
+     * @param nexCol La columna de destino.
+     * @param gridPane El GridPane que contiene el tablero.
+     */
+    private void movePieceToNewLocation(int nexRow, int nexCol, GridPane gridPane) {
+        StackPane targetStackPane = getStackPane(nexRow,nexCol,gridPane);
+        placePiece(targetStackPane);
+        dragAndDrop.setCanEatSomething(false);
+    }
+
+    /**
+     * Elimina la última imagen del StackPane.
+     *
+     * @param stackPane El StackPane de donde se eliminará la imagen.
+     */
+    private void removePiece(StackPane stackPane) {
+        stackPane.getChildren().remove(stackPane.getChildren().size() - 2);
     }
 
 
@@ -272,6 +461,157 @@ public class GameScene {
             }
         }
     }
+
+
+    /**
+     * Restaura la pieza a su posición original en el tablero si el movimiento realizado no es válido.
+     * Este método coloca la pieza en el StackPane de la posición inicial desde la cual fue arrastrada.
+     *
+     * @param starRow La fila de la posición original de la pieza.
+     * @param starCol La columna de la posición original de la pieza.
+     * @param gridPane El GridPane que contiene el tablero.
+     */
+    private void goBack(int starRow,int starCol,GridPane gridPane){
+        if (starCol == 0) {
+            StackPane stackPanE = (StackPane) gridPane.getChildren().get(starRow);
+            placePiece(stackPanE);
+        } else {
+            int index = (7 * starCol) + starRow + starCol;
+            StackPane stackPanE = (StackPane) gridPane.getChildren().get(index);
+            placePiece(stackPanE);
+        }
+
+
+    }
+
+
+
+    /**
+     * Verifica si hay piezas en el camino entre dos posiciones, dependiendo del tipo de movimiento (horizontal, vertical o diagonal).
+     *
+     * @param row      La fila de la posición inicial.
+     * @param col      La columna de la posición inicial.
+     * @param nexRow   La fila de la posición final.
+     * @param nexCol   La columna de la posición final.
+     * @param gridPane El GridPane que contiene el tablero.
+     * @return true si hay piezas en el camino; false en caso contrario.
+     */
+    private boolean piecesInTheMiddle(int row, int col, int nexRow, int nexCol, GridPane gridPane) {
+        boolean piecesInMiddle = false;
+
+        switch (dragAndDrop.getMovementType()) {
+            case "Horizontal":
+                piecesInMiddle = checkPiecesInTheMiddleHorizontal(row,col,nexCol,gridPane);
+                break;
+            case "Vertical":
+                piecesInMiddle = checkPiecesInTheMiddleVertical(row,col,nexRow,gridPane);
+                break;
+            case "Diagonal":
+                piecesInMiddle = checkPiecesInTheMiddleDiagonal(row,col,nexRow,nexCol,gridPane);
+                break;
+            default:
+                return piecesInMiddle;
+        }
+
+        return piecesInMiddle;
+
+    }
+
+
+    /**
+     * Verifica si hay piezas en el camino diagonal entre dos posiciones.
+     *
+     * @param starRow  La fila de la posición inicial.
+     * @param starCol  La columna de la posición inicial.
+     * @param nexRow   La fila de la posición final.
+     * @param nexCol   La columna de la posición final.
+     * @param gridPane El GridPane que contiene el tablero.
+     * @return true si hay piezas en el camino diagonal; false en caso contrario.
+     */
+    private boolean checkPiecesInTheMiddleDiagonal(int starRow, int starCol, int nexRow, int nexCol, GridPane gridPane) {
+        int rowStep = starRow < nexRow ? 1 : -1;  // Determina si incrementamos o decrementamos filas
+        int colStep = starCol < nexCol ? 1 : -1;  // Determina si incrementamos o decrementamos columnas
+        boolean piecesInMiddle = false;
+        int col = starCol;
+
+        for (int row = starRow + rowStep; row != nexRow; row += rowStep) {
+            col += colStep;  // Incrementa o decrementa la columna en cada paso
+
+            if (isPieceInStackPane(getStackPane(row, col, gridPane))) {
+                piecesInMiddle =  true;
+                break;
+            }
+        }
+
+        return piecesInMiddle;
+    }
+
+    /**
+     * Verifica si hay piezas en el camino vertical entre dos posiciones.
+     *
+     * @param starRow  La fila de la posición inicial.
+     * @param starCol  La columna de la posición inicial.
+     * @param nexRow   La fila de la posición final.
+     * @param gridPane El GridPane que contiene el tablero.
+     * @return true si hay piezas en el camino vertical; false en caso contrario.
+     */
+    private boolean checkPiecesInTheMiddleVertical(int starRow, int starCol, int nexRow, GridPane gridPane) {
+        int step = starRow > nexRow ? -1 : 1;  // Determina si incrementamos o decrementamos
+        boolean piecesInMiddle = false;
+
+        for (int row = starRow; row != nexRow; row += step) {
+            if (isPieceInStackPane(getStackPane(row, starCol, gridPane))) {
+                piecesInMiddle = true;
+                break;
+            }
+        }
+
+        return piecesInMiddle;
+    }
+
+    /**
+     * Verifica si hay piezas en el camino horizontal entre dos posiciones.
+     *
+     * @param starRow  La fila de la posición inicial.
+     * @param starCol  La columna de la posición inicial.
+     * @param nexCol   La columna de la posición final.
+     * @param gridPane El GridPane que contiene el tablero.
+     * @return true si hay piezas en el camino horizontal; false en caso contrario.
+     */
+    private boolean checkPiecesInTheMiddleHorizontal(int starRow, int starCol, int nexCol, GridPane gridPane) {
+        int step = starCol > nexCol ? -1 : 1;  // Determina si incrementamos o decrementamos
+        boolean piecesInMiddle = false;
+
+        for (int col = starCol; col != nexCol; col += step) {
+            if (isPieceInStackPane(getStackPane(starRow, col, gridPane))) {
+                piecesInMiddle = true;
+                break;
+            }
+        }
+        return piecesInMiddle;
+    }
+
+
+
+    /**
+     * Obtiene el StackPane en la fila y columna especificadas.
+     *
+     * @param row      La fila del StackPane.
+     * @param col      La columna del StackPane.
+     * @param gridPane El GridPane que contiene el tablero.
+     * @return El StackPane en la posición especificada.
+     */
+    private StackPane getStackPane(int row, int col, GridPane gridPane) {
+        if (col == 0) {
+            return (StackPane) gridPane.getChildren().get(row);
+        } else {
+            int index = (7 * col) + row + col;
+            return (StackPane) gridPane.getChildren().get(index);
+        }
+    }
+
+
+
 
 
 }
